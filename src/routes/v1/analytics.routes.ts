@@ -8,12 +8,14 @@ import {
   getAnalyticsRankings,
   getMarketComparison,
 } from '../../controllers/analytics.controller';
+import { overviewResponse, rankingsResponse, compareResponse } from '../schemas';
 
 export async function analyticsRoutes(app: FastifyInstance) {
   app.get('/analytics/overview', {
     schema: {
       description: 'Get ecosystem-wide overview: total markets, volume, average health score',
       tags: ['Analytics'],
+      response: overviewResponse,
     },
     handler: getAnalyticsOverview,
   });
@@ -37,10 +39,11 @@ export async function analyticsRoutes(app: FastifyInstance) {
           },
           limit: {
             type: 'string',
-            description: 'Number of results (default: 10)',
+            description: 'Number of results (default: 10, max: 50)',
           },
         },
       },
+      response: rankingsResponse,
     },
     handler: getAnalyticsRankings,
   });
@@ -59,6 +62,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
         },
         required: ['markets'],
       },
+      response: compareResponse,
     },
     handler: getMarketComparison,
   });

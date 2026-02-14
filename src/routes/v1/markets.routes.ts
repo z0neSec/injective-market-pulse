@@ -13,12 +13,21 @@ import {
   getMarketTrades,
   getMarketHealthHandler,
 } from '../../controllers/markets.controller';
+import {
+  marketsListResponse,
+  marketDetailResponse,
+  orderbookResponse,
+  tradesResponse,
+  healthResponse,
+  summaryResponse,
+  errorResponseSchema,
+} from '../schemas';
 
 export async function marketRoutes(app: FastifyInstance) {
   // ── Market Discovery ──────────────────────────
   app.get('/markets', {
     schema: {
-      description: 'List all markets (spot + derivative) with optional filters',
+      description: 'List all markets (spot + derivative) with optional filters, sorting, and pagination',
       tags: ['Markets'],
       querystring: {
         type: 'object',
@@ -26,26 +35,13 @@ export async function marketRoutes(app: FastifyInstance) {
           type: { type: 'string', enum: ['spot', 'derivative'], description: 'Filter by market type' },
           quote: { type: 'string', description: 'Filter by quote token symbol (e.g., USDT)' },
           search: { type: 'string', description: 'Search by ticker' },
-          limit: { type: 'string', description: 'Max results (default: 50)' },
+          sort: { type: 'string', enum: ['ticker', 'type'], description: 'Sort field (default: ticker)' },
+          order: { type: 'string', enum: ['asc', 'desc'], description: 'Sort order (default: asc)' },
+          limit: { type: 'string', description: 'Max results (default: 50, max: 100)' },
           offset: { type: 'string', description: 'Pagination offset (default: 0)' },
         },
       },
-      response: {
-        200: {
-          type: 'object',
-          properties: {
-            success: { type: 'boolean' },
-            data: {
-              type: 'object',
-              properties: {
-                markets: { type: 'array' },
-                total: { type: 'number' },
-              },
-            },
-            meta: { type: 'object' },
-          },
-        },
-      },
+      response: marketsListResponse,
     },
     handler: listMarkets,
   });
@@ -54,6 +50,9 @@ export async function marketRoutes(app: FastifyInstance) {
     schema: {
       description: 'List all active spot markets',
       tags: ['Markets'],
+      response: {
+        200: marketsListResponse[200],
+      },
     },
     handler: listSpotMarkets,
   });
@@ -62,6 +61,9 @@ export async function marketRoutes(app: FastifyInstance) {
     schema: {
       description: 'List all active derivative markets',
       tags: ['Markets'],
+      response: {
+        200: marketsListResponse[200],
+      },
     },
     handler: listDerivativeMarkets,
   });
@@ -77,6 +79,7 @@ export async function marketRoutes(app: FastifyInstance) {
         },
         required: ['marketId'],
       },
+      response: marketDetailResponse,
     },
     handler: getMarket,
   });
@@ -84,15 +87,16 @@ export async function marketRoutes(app: FastifyInstance) {
   // ── Market Intelligence ───────────────────────
   app.get('/markets/:marketId/summary', {
     schema: {
-      description: 'Get full market summary: market info + orderbook metrics + trade stats + health score',
+      description: 'Get full market summary: market info + orderbook metrics + trade stats + health score in a single call',
       tags: ['Market Intelligence'],
       params: {
         type: 'object',
         properties: {
-          marketId: { type: 'string' },
+          marketId: { type: 'string', description: 'The Injective market ID (0x...)' },
         },
         required: ['marketId'],
       },
+      response: summaryResponse,
     },
     handler: getMarketSummaryHandler,
   });
@@ -104,7 +108,7 @@ export async function marketRoutes(app: FastifyInstance) {
       params: {
         type: 'object',
         properties: {
-          marketId: { type: 'string' },
+          marketId: { type: 'string', description: 'The Injective market ID (0x...)' },
         },
         required: ['marketId'],
       },
@@ -114,18 +118,19 @@ export async function marketRoutes(app: FastifyInstance) {
           depth: { type: 'string', description: 'Number of orderbook levels (default: 25, max: 50)' },
         },
       },
+      response: orderbookResponse,
     },
     handler: getMarketOrderbook,
   });
 
   app.get('/markets/:marketId/trades', {
     schema: {
-      description: 'Get recent trades with computed statistics (volume, volatility, price change)',
+      description: 'Get recent trades with computed statistics: volume, volatility, price change, buy/sell ratio',
       tags: ['Market Intelligence'],
       params: {
         type: 'object',
         properties: {
-          marketId: { type: 'string' },
+          marketId: { type: 'string', description: 'The Injective market ID (0x...)' },
         },
         required: ['marketId'],
       },
@@ -135,6 +140,7 @@ export async function marketRoutes(app: FastifyInstance) {
           limit: { type: 'string', description: 'Number of recent trades (default: 50, max: 100)' },
         },
       },
+      response: tradesResponse,
     },
     handler: getMarketTrades,
   });
@@ -146,10 +152,11 @@ export async function marketRoutes(app: FastifyInstance) {
       params: {
         type: 'object',
         properties: {
-          marketId: { type: 'string' },
+          marketId: { type: 'string', description: 'The Injective market ID (0x...)' },
         },
         required: ['marketId'],
       },
+      response: healthResponse,
     },
     handler: getMarketHealthHandler,
   });

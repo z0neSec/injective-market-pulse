@@ -70,6 +70,8 @@ export async function getFilteredMarkets(filters: {
   type?: 'spot' | 'derivative';
   quote?: string;
   search?: string;
+  sort?: 'ticker' | 'type';
+  order?: 'asc' | 'desc';
   limit?: number;
   offset?: number;
 }): Promise<{ markets: NormalizedMarket[]; total: number }> {
@@ -94,6 +96,17 @@ export async function getFilteredMarkets(filters: {
     const search = filters.search.toLowerCase();
     markets = markets.filter((m) => m.ticker.toLowerCase().includes(search));
   }
+
+  // Sorting
+  const sortField = filters.sort || 'ticker';
+  const sortOrder = filters.order === 'desc' ? -1 : 1;
+  markets.sort((a, b) => {
+    const valA = a[sortField];
+    const valB = b[sortField];
+    if (valA < valB) return -1 * sortOrder;
+    if (valA > valB) return 1 * sortOrder;
+    return 0;
+  });
 
   const total = markets.length;
 

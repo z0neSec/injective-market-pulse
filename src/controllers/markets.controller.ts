@@ -28,15 +28,19 @@ export async function listMarkets(
       type?: string;
       quote?: string;
       search?: string;
+      sort?: string;
+      order?: string;
       limit?: string;
       offset?: string;
     };
   }>,
   reply: FastifyReply
 ) {
-  const { type, quote, search, limit, offset } = request.query;
+  const { type, quote, search, sort, order, limit, offset } = request.query;
 
   const validType = parseEnumParam(type, 'type', ['spot', 'derivative'] as const);
+  const validSort = parseEnumParam(sort, 'sort', ['ticker', 'type'] as const);
+  const validOrder = parseEnumParam(order, 'order', ['asc', 'desc'] as const);
   const validLimit = parseIntParam(limit, 'limit', { default: 50, min: 1, max: 100 });
   const validOffset = parseIntParam(offset, 'offset', { default: 0, min: 0, max: 10000 });
 
@@ -44,6 +48,8 @@ export async function listMarkets(
     type: validType,
     quote,
     search,
+    sort: validSort,
+    order: validOrder,
     limit: validLimit,
     offset: validOffset,
   });

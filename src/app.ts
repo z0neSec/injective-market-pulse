@@ -7,6 +7,8 @@
 
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import compress from '@fastify/compress';
+import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
@@ -27,6 +29,14 @@ export async function buildApp() {
 
   // ── CORS ──────────────────────────────────────
   await app.register(cors, { origin: true });
+
+  // ── Security Headers ──────────────────────────
+  await app.register(helmet, {
+    contentSecurityPolicy: false, // Disabled for Swagger UI compatibility
+  });
+
+  // ── Response Compression ──────────────────────
+  await app.register(compress, { threshold: 1024 });
 
   // ── Request ID & Timing ───────────────────────
   app.addHook('onRequest', async (request) => {

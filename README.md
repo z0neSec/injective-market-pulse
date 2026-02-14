@@ -400,16 +400,20 @@ All data is fetched via the official `@injectivelabs/sdk-ts` TypeScript SDK.
 ### Key Design Decisions
 
 - **Layered architecture**: Clients → Services → Controllers → Routes — clean separation of concerns
-- **In-memory caching**: TTL-based cache per data type (10-60s) — no external dependencies
+- **In-memory caching with stale fallback**: TTL-based cache per data type (10-60s); on upstream failure, serves last-known-good data
 - **Consistent response envelope**: Every response has `success`, `data`, `meta` fields
 - **Structured error handling**: Custom error classes with HTTP codes and error codes
 - **Input validation**: Centralized parameter validation with bounds checking and meaningful error messages
+- **Security headers**: `@fastify/helmet` adds HSTS, X-Content-Type-Options, etc.
+- **Response compression**: `@fastify/compress` with 1KB threshold reduces payload sizes
 - **Rate limiting**: 100 req/min per IP with proper 429 responses
 - **Response headers**: `X-Response-Time` and `X-Request-Id` on every response for debugging
 - **Graceful shutdown**: Handles SIGTERM/SIGINT for clean container deployments
-- **OpenAPI/Swagger**: Auto-generated interactive docs at `/docs`
+- **OpenAPI/Swagger**: Full response schemas on all endpoints — interactive docs at `/docs`
 - **Versioned API**: `/api/v1/` prefix — v2 can be added without breaking v1
 - **Production Dockerfile**: Multi-stage build with health checks
+- **Test suite**: 52 unit tests covering math, decimals, validation, and response formatting
+- **CI/CD**: GitHub Actions runs typecheck, tests, and build on every push
 
 ---
 
@@ -418,26 +422,27 @@ All data is fetched via the official `@injectivelabs/sdk-ts` TypeScript SDK.
 ```
 injective-market-pulse/
 ├── src/
-│   ├── index.ts                     # Entry point
-│   ├── app.ts                       # Fastify app setup
+│   ├── index.ts                     # Entry point + graceful shutdown
+│   ├── app.ts                       # Fastify app setup (middleware, docs, error handling)
 │   ├── config/
 │   │   └── index.ts                 # Environment config
 │   ├── clients/
 │   │   ├── injective.ts             # Injective SDK client init
 │   │   └── index.ts
 │   ├── services/
-│   │   ├── market.service.ts        # Market normalization
+│   │   ├── market.service.ts        # Market normalization + filtering + sorting
 │   │   ├── orderbook.service.ts     # Orderbook + depth metrics
 │   │   ├── trades.service.ts        # Trades + volatility
 │   │   ├── health.service.ts        # Health score algorithm
-│   │   ├── analytics.service.ts     # Cross-market analytics
-│   │   ├── cache.service.ts         # In-memory caching
+│   │   ├── analytics.service.ts     # Cross-market analytics + comparison
+│   │   ├── cache.service.ts         # In-memory caching + stale fallback
 │   │   └── index.ts
 │   ├── controllers/
 │   │   ├── markets.controller.ts
 │   │   ├── analytics.controller.ts
 │   │   └── status.controller.ts
 │   ├── routes/
+│   │   ├── schemas.ts               # Shared OpenAPI response schemas
 │   │   ├── v1/
 │   │   │   ├── markets.routes.ts
 │   │   │   ├── analytics.routes.ts
@@ -451,9 +456,18 @@ injective-market-pulse/
 │   └── utils/
 │       ├── errors.ts                # Custom error classes
 │       ├── response.ts              # Response envelope
+│       ├── validation.ts            # Input validation + bounds checking
 │       ├── decimals.ts              # Chain ↔ human conversions
 │       ├── math.ts                  # Volatility, spread, etc.
 │       └── index.ts
+├── tests/
+│   ├── math.test.ts                 # 18 tests for math utilities
+│   ├── decimals.test.ts             # 14 tests for decimal conversions
+│   ├── validation.test.ts           # 12 tests for input validation
+│   └── response.test.ts             # 8 tests for response/error classes
+├── .github/
+│   └── workflows/
+│       └── ci.yml                   # GitHub Actions CI
 ├── .env.example
 ├── .gitignore
 ├── tsconfig.json
@@ -471,9 +485,13 @@ injective-market-pulse/
 | Runtime | Node.js + TypeScript | Matches Injective SDK language |
 | Framework | Fastify | 2x faster than Express, built-in schema validation |
 | SDK | `@injectivelabs/sdk-ts` | Official Injective TypeScript SDK |
-| Docs | `@fastify/swagger` + Swagger UI | Auto-generated OpenAPI docs |
-| Caching | `node-cache` | In-memory TTL cache, zero external deps |
+| Docs | `@fastify/swagger` + Swagger UI | Full OpenAPI 3.0 response schemas on all endpoints |
+| Caching | `node-cache` | In-memory TTL cache with stale-data fallback |
 | Rate Limiting | `@fastify/rate-limit` | Per-IP rate limiting |
+| Security | `@fastify/helmet` | HSTS, X-Content-Type-Options, etc. |
+| Compression | `@fastify/compress` | Gzip for responses > 1KB |
+| Testing | Vitest | 52 unit tests, fast ESM-native runner |
+| CI | GitHub Actions | Typecheck + test + build on every push |
 
 ---
 

@@ -15,21 +15,44 @@ const cache = new NodeCache({
 });
 
 /**
+ * Stale cache — retains last-known-good data even after TTL expiration.
+ * Used as a fallback when upstream (Injective indexer) is unavailable.
+ */
+const staleCache = new NodeCache({
+  stdTTL: 0, // No automatic expiry — manually updated
+  checkperiod: 0,
+  useClones: false,
+});
+
+/**
  * Get a value from cache, or compute + store it if missing.
+ * On upstream failure, falls back to stale (last-known-good) data if available.
  */
 export async function cacheGetOrSet<T>(
   key: string,
   ttl: number,
   fetcher: () => Promise<T>
-): Promise<{ data: T; cached: boolean }> {
+): Promise<{ data: T; cached: boolean; stale?: boolean }> {
   const existing = cache.get<T>(key);
   if (existing !== undefined) {
     return { data: existing, cached: true };
   }
 
-  const data = await fetcher();
-  cache.set(key, data, ttl);
-  return { data, cached: false };
+  try {
+    const data = await fetcher();
+    cache.set(key, data, ttl);
+    staleCache.set(key, data); // Update stale backup
+    return { data, cached: false };
+  } catch (error) {
+    // Fallback to stale data if upstream fails
+    const stale = staleCache.get<T>(key);
+    if (stale !== undefined) {
+      // Re-cache the stale data with a short TTL to avoid hammering the upstream
+      cache.set(key, stale, Math.min(ttl, 15));
+      return { data: stale, cached: true, stale: true };
+    }
+    throw error; // No stale data available, propagate the error
+  }
 }
 
 /**
