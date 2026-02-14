@@ -23,7 +23,7 @@ Injective provides powerful on-chain trading primitives, but developers building
 ## Quick Start
 
 ```bash
-git clone https://github.com/yourusername/injective-market-pulse.git
+git clone https://github.com/z0neSec/injective-market-pulse.git
 cd injective-market-pulse
 npm install
 cp .env.example .env
