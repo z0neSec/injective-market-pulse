@@ -175,3 +175,30 @@ export interface MarketRanking {
   value: number;
   metric: string;
 }
+
+/**
+ * Side-by-side market comparison entry.
+ */
+export interface MarketComparisonEntry {
+  marketId: string;
+  ticker: string;
+  type: 'spot' | 'derivative';
+  midPrice: number;
+  spreadBps: number;
+  liquidityDepth: number;
+  volume: number;
+  volatility: number;
+  healthScore: number;
+  healthGrade: string;
+}
+
+/**
+ * Result of comparing multiple markets.
+ */
+export interface MarketComparison {
+  markets: MarketComparisonEntry[];
+  bestBySpread: string;
+  bestByLiquidity: string;
+  bestByHealth: string;
+  comparedAt: string;
+}

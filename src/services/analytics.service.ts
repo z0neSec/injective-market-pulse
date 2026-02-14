@@ -10,8 +10,9 @@ import { getAllMarkets } from './market.service';
 import { getOrderbookMetrics } from './orderbook.service';
 import { getTradeStats } from './trades.service';
 import { getMarketHealth } from './health.service';
-import { AnalyticsOverview, MarketRanking, NormalizedMarket, MarketSummary } from '../types';
+import { AnalyticsOverview, MarketRanking, NormalizedMarket, MarketSummary, MarketComparison, MarketComparisonEntry } from '../types';
 import { toFixedSafe } from '../utils/decimals';
+import { InvalidParameterError } from '../utils/errors';
 
 /**
  * Get ecosystem-wide overview.
@@ -203,6 +204,73 @@ export async function getMarketSummary(marketId: string): Promise<MarketSummary>
       },
       timestamp: new Date().toISOString(),
     };
+  });
+
+  return data;
+}
+
+/**
+ * Compare 2-5 markets side-by-side across key metrics.
+ */
+export async function compareMarkets(marketIds: string[]): Promise<MarketComparison> {
+  if (marketIds.length < 2 || marketIds.length > 5) {
+    throw new InvalidParameterError('marketIds', 'must provide 2-5 market IDs to compare');
+  }
+
+  const cacheKey = `compare:${[...marketIds].sort().join(':')}`;
+  const { data } = await cacheGetOrSet(cacheKey, cacheTTL.health, async () => {
+    const { getMarketById } = await import('./market.service');
+    const { MarketNotFoundError } = await import('../utils/errors');
+
+    const entries: MarketComparisonEntry[] = [];
+
+    const results = await Promise.allSettled(
+      marketIds.map(async (id) => {
+        const market = await getMarketById(id);
+        if (!market) throw new MarketNotFoundError(id);
+
+        const [obMetrics, tradeStats, health] = await Promise.all([
+          getOrderbookMetrics(id),
+          getTradeStats(id, 100),
+          getMarketHealth(id),
+        ]);
+
+        return {
+          marketId: market.marketId,
+          ticker: market.ticker,
+          type: market.type,
+          midPrice: obMetrics.midPrice,
+          spreadBps: obMetrics.relativeSpreadBps,
+          liquidityDepth: toFixedSafe(obMetrics.bidDepthNotional + obMetrics.askDepthNotional, 2),
+          volume: tradeStats.totalNotional,
+          volatility: tradeStats.volatility,
+          healthScore: health.healthScore,
+          healthGrade: health.healthGrade,
+        } as MarketComparisonEntry;
+      })
+    );
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        entries.push(result.value);
+      }
+    }
+
+    if (entries.length < 2) {
+      throw new InvalidParameterError('marketIds', 'at least 2 valid markets required for comparison');
+    }
+
+    const bestBySpread = [...entries].sort((a, b) => a.spreadBps - b.spreadBps)[0].ticker;
+    const bestByLiquidity = [...entries].sort((a, b) => b.liquidityDepth - a.liquidityDepth)[0].ticker;
+    const bestByHealth = [...entries].sort((a, b) => b.healthScore - a.healthScore)[0].ticker;
+
+    return {
+      markets: entries,
+      bestBySpread,
+      bestByLiquidity,
+      bestByHealth,
+      comparedAt: new Date().toISOString(),
+    } as MarketComparison;
   });
 
   return data;

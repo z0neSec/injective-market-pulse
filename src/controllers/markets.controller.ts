@@ -17,6 +17,7 @@ import {
 } from '../services';
 import { successResponse } from '../utils/response';
 import { MarketNotFoundError } from '../utils/errors';
+import { parseIntParam, parseEnumParam, validateMarketId } from '../utils/validation';
 
 /**
  * GET /v1/markets
@@ -35,17 +36,29 @@ export async function listMarkets(
 ) {
   const { type, quote, search, limit, offset } = request.query;
 
+  const validType = parseEnumParam(type, 'type', ['spot', 'derivative'] as const);
+  const validLimit = parseIntParam(limit, 'limit', { default: 50, min: 1, max: 100 });
+  const validOffset = parseIntParam(offset, 'offset', { default: 0, min: 0, max: 10000 });
+
   const result = await getFilteredMarkets({
-    type: type as any,
+    type: validType,
     quote,
     search,
-    limit: limit ? parseInt(limit, 10) : 50,
-    offset: offset ? parseInt(offset, 10) : 0,
+    limit: validLimit,
+    offset: validOffset,
   });
 
   return reply.send(
     successResponse(
-      { markets: result.markets, total: result.total },
+      {
+        markets: result.markets,
+        total: result.total,
+        pagination: {
+          limit: validLimit,
+          offset: validOffset,
+          hasMore: validOffset + validLimit < result.total,
+        },
+      },
       '60s'
     )
   );
@@ -80,7 +93,7 @@ export async function getMarket(
   request: FastifyRequest<{ Params: { marketId: string } }>,
   reply: FastifyReply
 ) {
-  const { marketId } = request.params;
+  const marketId = validateMarketId(request.params.marketId);
   const market = await getMarketById(marketId);
   if (!market) throw new MarketNotFoundError(marketId);
   return reply.send(successResponse(market, '60s'));
@@ -93,7 +106,8 @@ export async function getMarketSummaryHandler(
   request: FastifyRequest<{ Params: { marketId: string } }>,
   reply: FastifyReply
 ) {
-  const summary = await getMarketSummary(request.params.marketId);
+  const marketId = validateMarketId(request.params.marketId);
+  const summary = await getMarketSummary(marketId);
   return reply.send(successResponse(summary, '30s'));
 }
 
@@ -107,8 +121,9 @@ export async function getMarketOrderbook(
   }>,
   reply: FastifyReply
 ) {
-  const depth = request.query.depth ? parseInt(request.query.depth, 10) : 25;
-  const ob = await getOrderbook(request.params.marketId, depth);
+  const marketId = validateMarketId(request.params.marketId);
+  const depth = parseIntParam(request.query.depth, 'depth', { default: 25, min: 1, max: 50 });
+  const ob = await getOrderbook(marketId, depth);
   return reply.send(successResponse(ob, '10s'));
 }
 
@@ -122,8 +137,9 @@ export async function getMarketTrades(
   }>,
   reply: FastifyReply
 ) {
-  const limit = request.query.limit ? parseInt(request.query.limit, 10) : 50;
-  const stats = await getTradeStats(request.params.marketId, limit);
+  const marketId = validateMarketId(request.params.marketId);
+  const limit = parseIntParam(request.query.limit, 'limit', { default: 50, min: 1, max: 100 });
+  const stats = await getTradeStats(marketId, limit);
   return reply.send(successResponse(stats, '10s'));
 }
 
@@ -134,6 +150,7 @@ export async function getMarketHealthHandler(
   request: FastifyRequest<{ Params: { marketId: string } }>,
   reply: FastifyReply
 ) {
-  const health = await getMarketHealth(request.params.marketId);
+  const marketId = validateMarketId(request.params.marketId);
+  const health = await getMarketHealth(marketId);
   return reply.send(successResponse(health, '30s'));
 }

@@ -6,6 +6,7 @@ import { FastifyInstance } from 'fastify';
 import {
   getAnalyticsOverview,
   getAnalyticsRankings,
+  getMarketComparison,
 } from '../../controllers/analytics.controller';
 
 export async function analyticsRoutes(app: FastifyInstance) {
@@ -42,5 +43,23 @@ export async function analyticsRoutes(app: FastifyInstance) {
       },
     },
     handler: getAnalyticsRankings,
+  });
+
+  app.get('/analytics/compare', {
+    schema: {
+      description: 'Compare 2-5 markets side-by-side across key metrics (spread, liquidity, health, volatility)',
+      tags: ['Analytics'],
+      querystring: {
+        type: 'object',
+        properties: {
+          markets: {
+            type: 'string',
+            description: 'Comma-separated market IDs to compare (2-5 IDs)',
+          },
+        },
+        required: ['markets'],
+      },
+    },
+    handler: getMarketComparison,
   });
 }

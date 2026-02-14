@@ -62,6 +62,7 @@ API running at **http://localhost:3000** — Interactive docs at **http://localh
 |--------|----------|-------------|
 | `GET` | `/api/v1/analytics/overview` | Ecosystem-wide stats: total markets, volume, avg health |
 | `GET` | `/api/v1/analytics/rankings` | Markets ranked by volume, liquidity, health, spread |
+| `GET` | `/api/v1/analytics/compare` | **Compare 2-5 markets side-by-side** |
 
 ### System
 
@@ -199,6 +200,121 @@ curl 'http://localhost:3000/api/v1/analytics/rankings?metric=health&limit=5'
 curl http://localhost:3000/api/v1/markets/0x9b9980167ecc3645ff1a5517886652d94a0825e54a77d2057cbbe3ebee015963/summary
 ```
 
+### Compare markets side-by-side
+
+```bash
+curl 'http://localhost:3000/api/v1/analytics/compare?markets=0x0511ddc4e6586f3bfe1acb2dd905f8b8a82c97e1edaef654b12ca7e6031ca0fa,0x9b9980167ecc3645ff1a5517886652d94a0825e54a77d2057cbbe3ebee015963'
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "markets": [
+      {
+        "ticker": "ATOM/USDT",
+        "midPrice": 2.114,
+        "spreadBps": 9.46,
+        "liquidityDepth": 86117.94,
+        "volume": 2637.2,
+        "volatility": 0.00047,
+        "healthScore": 60,
+        "healthGrade": "C"
+      },
+      {
+        "ticker": "INJ/USDT",
+        "midPrice": 12.35,
+        "spreadBps": 4.05,
+        "liquidityDepth": 125000.5,
+        "volume": 15420.8,
+        "volatility": 0.0012,
+        "healthScore": 72,
+        "healthGrade": "B"
+      }
+    ],
+    "bestBySpread": "INJ/USDT",
+    "bestByLiquidity": "INJ/USDT",
+    "bestByHealth": "INJ/USDT"
+  }
+}
+```
+
+---
+
+## Testing the API
+
+### Quick Start (Local)
+
+```bash
+# 1. Start the server
+npm run dev
+
+# 2. Open interactive Swagger docs in your browser
+open http://localhost:3000/docs
+```
+
+### Testing Every Endpoint with curl
+
+Below is a complete set of curl commands to test every endpoint. Replace `BASE` with your server URL.
+
+```bash
+BASE=http://localhost:3000
+
+# ── System ────────────────────────────────────────
+curl $BASE/api/v1/status | jq
+
+# ── Market Discovery ─────────────────────────────
+curl "$BASE/api/v1/markets?limit=5" | jq
+curl "$BASE/api/v1/markets?type=spot&quote=USDT&limit=3" | jq
+curl "$BASE/api/v1/markets?search=INJ" | jq
+curl $BASE/api/v1/markets/spot | jq
+curl $BASE/api/v1/markets/derivative | jq
+
+# Pick a market ID from the list above, e.g.:
+MKT=0x0511ddc4e6586f3bfe1acb2dd905f8b8a82c97e1edaef654b12ca7e6031ca0fa
+
+curl $BASE/api/v1/markets/$MKT | jq
+
+# ── Market Intelligence ──────────────────────────
+curl "$BASE/api/v1/markets/$MKT/orderbook?depth=10" | jq
+curl "$BASE/api/v1/markets/$MKT/trades?limit=20" | jq
+curl $BASE/api/v1/markets/$MKT/health | jq
+curl $BASE/api/v1/markets/$MKT/summary | jq
+
+# ── Analytics ────────────────────────────────────
+curl $BASE/api/v1/analytics/overview | jq
+curl "$BASE/api/v1/analytics/rankings?metric=health&limit=5" | jq
+curl "$BASE/api/v1/analytics/rankings?metric=volume&type=spot&limit=3" | jq
+curl "$BASE/api/v1/analytics/rankings?metric=spread&limit=5" | jq
+
+# ── Compare Markets ─────────────────────────────
+MKT2=0x9b9980167ecc3645ff1a5517886652d94a0825e54a77d2057cbbe3ebee015963
+curl "$BASE/api/v1/analytics/compare?markets=$MKT,$MKT2" | jq
+
+# ── Error Handling (verify proper error responses) ──
+curl $BASE/api/v1/markets/0xinvalid | jq         # 400 invalid format
+curl "$BASE/api/v1/markets?limit=999" | jq        # 400 out of range
+curl $BASE/api/v1/nonexistent | jq                # 404 not found
+```
+
+### Testing with the Live API
+
+You can also test against the deployed production API:
+
+```bash
+BASE=https://injective-market-pulse.onrender.com
+
+curl $BASE/api/v1/status | jq
+curl "$BASE/api/v1/markets?type=spot&limit=3" | jq
+curl "$BASE/api/v1/analytics/rankings?metric=health&limit=5" | jq
+```
+
+### Interactive Swagger UI
+
+Visit [https://injective-market-pulse.onrender.com/docs](https://injective-market-pulse.onrender.com/docs) to explore all endpoints interactively. You can click "Try it out" on any endpoint to execute it directly from the browser.
+
 ---
 
 ## Query Parameters
@@ -215,6 +331,7 @@ curl http://localhost:3000/api/v1/markets/0x9b9980167ecc3645ff1a5517886652d94a08
 | `/analytics/rankings` | `metric` | `volume`, `liquidity`, `health`, `spread`, `volatility` |
 | `/analytics/rankings` | `type` | `spot` or `derivative` |
 | `/analytics/rankings` | `limit` | Number of results (default: 10) |
+| `/analytics/compare` | `markets` | Comma-separated market IDs (2-5 required) |
 
 ---
 
@@ -286,9 +403,13 @@ All data is fetched via the official `@injectivelabs/sdk-ts` TypeScript SDK.
 - **In-memory caching**: TTL-based cache per data type (10-60s) — no external dependencies
 - **Consistent response envelope**: Every response has `success`, `data`, `meta` fields
 - **Structured error handling**: Custom error classes with HTTP codes and error codes
+- **Input validation**: Centralized parameter validation with bounds checking and meaningful error messages
 - **Rate limiting**: 100 req/min per IP with proper 429 responses
+- **Response headers**: `X-Response-Time` and `X-Request-Id` on every response for debugging
+- **Graceful shutdown**: Handles SIGTERM/SIGINT for clean container deployments
 - **OpenAPI/Swagger**: Auto-generated interactive docs at `/docs`
 - **Versioned API**: `/api/v1/` prefix — v2 can be added without breaking v1
+- **Production Dockerfile**: Multi-stage build with health checks
 
 ---
 

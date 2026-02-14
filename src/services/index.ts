@@ -2,5 +2,5 @@ export { getSpotMarkets, getDerivativeMarkets, getAllMarkets, getMarketById, get
 export { getOrderbook, getOrderbookMetrics } from './orderbook.service';
 export { getTradeStats } from './trades.service';
 export { getMarketHealth } from './health.service';
-export { getOverview, getRankings, getMarketSummary } from './analytics.service';
+export { getOverview, getRankings, getMarketSummary, compareMarkets } from './analytics.service';
 export { cacheStats } from './cache.service';

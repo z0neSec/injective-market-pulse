@@ -28,6 +28,20 @@ export async function buildApp() {
   // ── CORS ──────────────────────────────────────
   await app.register(cors, { origin: true });
 
+  // ── Request ID & Timing ───────────────────────
+  app.addHook('onRequest', async (request) => {
+    (request as any).startTime = process.hrtime.bigint();
+  });
+
+  app.addHook('onSend', async (request, reply) => {
+    const start = (request as any).startTime;
+    if (start) {
+      const elapsed = Number(process.hrtime.bigint() - start) / 1e6;
+      reply.header('X-Response-Time', `${elapsed.toFixed(2)}ms`);
+    }
+    reply.header('X-Request-Id', request.id);
+  });
+
   // ── Rate Limiting ─────────────────────────────
   await app.register(rateLimit, {
     max: config.rateLimit.max,
@@ -57,10 +71,11 @@ export async function buildApp() {
         version: '1.0.0',
         contact: {
           name: 'Injective Market Pulse',
-          url: 'https://github.com/yourusername/injective-market-pulse',
+          url: 'https://github.com/z0neSec/injective-market-pulse',
         },
       },
       servers: [
+        { url: 'https://injective-market-pulse.onrender.com', description: 'Production' },
         { url: `http://localhost:${config.server.port}`, description: 'Local' },
       ],
       tags: [
