@@ -8,7 +8,7 @@
 import {
   IndexerGrpcSpotApi,
   IndexerGrpcDerivativesApi,
-} from '@injectivelabs/sdk-ts/client/indexer';
+} from '@injectivelabs/sdk-ts';
 import { getNetworkEndpoints, Network } from '@injectivelabs/networks';
 import { config } from '../config';
 
