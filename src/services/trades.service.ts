@@ -10,7 +10,12 @@ import { cacheGetOrSet, cacheTTL } from './cache.service';
 import { getMarketById } from './market.service';
 import { NormalizedTrade, TradeStats, NormalizedMarket } from '../types';
 import { MarketNotFoundError, InjectiveClientError } from '../utils/errors';
-import { toFixedSafe } from '../utils/decimals';
+import {
+  spotPriceToHuman,
+  spotQuantityToHuman,
+  derivativePriceToHuman,
+  toFixedSafe,
+} from '../utils/decimals';
 import { realizedVolatility } from '../utils/math';
 
 /**
@@ -55,14 +60,13 @@ function normalizeTrade(t: any, market: NormalizedMarket): NormalizedTrade {
   let quantity: number;
 
   if (market.type === 'spot') {
-    // Spot trade prices from SDK are already human-readable
-    price = parseFloat(t.price || '0');
-    quantity = parseFloat(t.quantity || '0');
-    // Quantity is in chain format for spot
-    quantity = quantity / Math.pow(10, market.baseDecimals);
+    // Spot prices are in chain format: multiply by 10^(baseDecimals - quoteDecimals)
+    price = spotPriceToHuman(t.price || '0', market.baseDecimals, market.quoteDecimals);
+    // Spot quantities are in chain format: divide by 10^baseDecimals
+    quantity = spotQuantityToHuman(t.quantity || '0', market.baseDecimals);
   } else {
-    // Derivative prices are in chain format: executionPrice / 10^quoteDecimals
-    price = parseFloat(t.executionPrice || t.price || '0') / Math.pow(10, market.quoteDecimals);
+    // Derivative prices are in chain format: divide by 10^quoteDecimals
+    price = derivativePriceToHuman(t.executionPrice || t.price || '0', market.quoteDecimals);
     // Derivative quantities are already human-readable
     quantity = parseFloat(t.executionQuantity || t.quantity || '0');
   }

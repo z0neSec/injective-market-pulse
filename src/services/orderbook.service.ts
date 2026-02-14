@@ -86,14 +86,13 @@ function processLevels(
     let quantity: number;
 
     if (market.type === 'spot') {
-      // Spot orderbook prices from SDK are already human-readable
-      price = parseFloat(level.price);
-      quantity = parseFloat(level.quantity);
-      // Convert quantity from chain format
-      quantity = quantity / Math.pow(10, market.baseDecimals);
+      // Spot prices are in chain format: multiply by 10^(baseDecimals - quoteDecimals)
+      price = spotPriceToHuman(level.price, market.baseDecimals, market.quoteDecimals);
+      // Spot quantities are in chain format: divide by 10^baseDecimals
+      quantity = spotQuantityToHuman(level.quantity, market.baseDecimals);
     } else {
-      // Derivative prices from SDK are in chain format (price * 10^quoteDecimals)
-      price = parseFloat(level.price) / Math.pow(10, market.quoteDecimals);
+      // Derivative prices are in chain format: divide by 10^quoteDecimals
+      price = derivativePriceToHuman(level.price, market.quoteDecimals);
       // Derivative quantities are already human-readable
       quantity = parseFloat(level.quantity);
     }
