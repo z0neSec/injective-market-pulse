@@ -2,6 +2,8 @@
 
 > **Infrastructure-grade REST API** that transforms raw Injective on-chain data into actionable market intelligence — liquidity depth, volatility, spread analysis, and health scores in developer-friendly JSON.
 
+**Live API**: [https://injective-market-pulse.onrender.com](https://injective-market-pulse.onrender.com) | **Docs**: [https://injective-market-pulse.onrender.com/docs](https://injective-market-pulse.onrender.com/docs)
+
 Built for the **Ninja API Forge** hackathon.
 
 ---
